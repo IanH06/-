@@ -8,7 +8,7 @@ class MainWindow(qtw.QMainWindow):
     def __init__(self):
         self.page = 0
         super().__init__()
-        self.setWindowTitle("Notes Taking App")
+        self.setWindowTitle("Note Taking App")
 
         self.menuGrid = qtw.QGridLayout()
         self.deckSelect = qtw.QGridLayout()
@@ -54,6 +54,9 @@ class MainWindow(qtw.QMainWindow):
 
     def deckList(self):
         self.setCentralWidget(self.WDeck)
+
+    def openDeck(self):
+        pass   
 
 
     def getNextUID(self):
