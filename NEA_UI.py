@@ -121,6 +121,7 @@ class deckMenu(qtw.QWidget):
         super().__init__()
         self.ID = a
         self.deckSelect = qtw.QGridLayout()
+        self.getIndex("123: jdsnfksjnfkjsd")
     
         self.decks = qtw.QListWidget()
 
@@ -146,15 +147,17 @@ class deckMenu(qtw.QWidget):
         self.getDeckList()
 
     def getDeckList(self):
+        self.decks.clear()
         sql = f'''SELECT * FROM decks WHERE UID = "{self.ID}"'''
         decks =userdb_connect.execute(sql)
-        decks = [x for x in decks]
-        for i in decks:
-            self.decks.addItem(f"{i[0]}: {i[2]} [{i[1]}]")
+        self.deckL = [x for x in decks]
+        print(self.deckL)
+        for i,j in enumerate(self.deckL):
+            self.decks.addItem(f"{i+1}: {j[2]}")
         
     def openDeck(self):
         if self.decks.currentItem():
-            self.parentWidget().rNotes()
+            self.parentWidget().sDeck()
         else:
             nodeck = qtw.QMessageBox()
             nodeck.setIcon(qtw.QMessageBox.Warning)
@@ -167,11 +170,19 @@ class deckMenu(qtw.QWidget):
         self.parentWidget().menuSel()
 
     def newDeck(self):
-        self.parentWidget().cDeck()
+        text, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the deck", "Deck Name:")
+        if ok and text:
+            self.parentWidget().cDeck(text)
 
     def removeDeck(self):
         if self.decks.currentItem():
             print(f"deleting {self.decks.currentItem().text()}")
+            ind = (self.getIndex(self.decks.currentItem().text()))
+            b = self.deckL[ind]
+            sql = f'''DELETE FROM decks WHERE DID = "{b[0]}"'''
+            userdb_connect.execute(sql)
+            userdb_connect.commit()
+            self.getDeckList()
         else:
             nodeck = qtw.QMessageBox()
             nodeck.setIcon(qtw.QMessageBox.Warning)
@@ -179,7 +190,16 @@ class deckMenu(qtw.QWidget):
             nodeck.setWindowTitle("Please select a deck")
             nodeck.setStandardButtons(qtw.QMessageBox.Ok)
             nodeck.exec()
+    
+    def getIndex(self,a):
+        text = ""
+        for i in a:
+            if i == ":":
+                break
+            text += i
+        return int(text) -1
 
+    
 class selDeck(qtw.QWidget):
     def __init__(self):
         super().__init__()
@@ -188,30 +208,50 @@ class selDeck(qtw.QWidget):
         self.setLayout(self.gLayout)
 
 class createDeck(qtw.QWidget):
-    def __init__(self):
+    def __init__(self, name, ID):
         super().__init__()
+        self.ID = ID
+        self.dName = name
         self.gLayout = qtw.QGridLayout()
 
+        self.deckSelect = qtw.QPushButton("Return to Deck Select")
+        self.deckSelect.clicked.connect(self.deckSel)
+
+        self.gLayout.addWidget(self.deckSelect,0,0,1,1)
+        self.createSQL()
+
         self.setLayout(self.gLayout)
+
+    def deckSel(self):
+        self.parentWidget().deckSel()
+
+    def createSQL(self):
+        sql = ''' INSERT INTO decks (UID, deckName) VALUES(?,?)'''
+        userdb_connect.execute(sql, (self.ID,self.dName))
+        userdb_connect.commit()
 
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.ID = 12
+        self.ID = None
         self.setWindowTitle("Note Taking App")
         self.setCentralWidget(mainMenu())
     
     def deckSel(self):
+        self.setWindowTitle("Deck Selection")
         self.setCentralWidget(deckMenu(self.ID))
 
     def menuSel(self):
+        self.setWindowTitle("Note Taking App")
         self.setCentralWidget(mainMenu())
 
     def sDeck(self):
+        self.setWindowTitle("Deck Selection")
         self.setCentralWidget(selDeck())
 
-    def cDeck(self):
-        self.setCentralWidget(createDeck())
+    def cDeck(self, name):
+        self.setWindowTitle(f"{name}'s Decks")
+        self.setCentralWidget(createDeck(name,self.ID))
 
 
 def main():
