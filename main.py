@@ -1,11 +1,4 @@
-from NEA_UI import MainWindow
-import PyQt5.QtWidgets as qtw
-
-def main():
-    app = qtw.QApplication([])
-    window = MainWindow()
-    window.show()
-    app.exec_()
+from NEA_UI import main
 
 if __name__ == "__main__":
     main()  
