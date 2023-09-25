@@ -121,7 +121,6 @@ class deckMenu(qtw.QWidget):
         super().__init__()
         self.ID = a
         self.deckSelect = qtw.QGridLayout()
-        self.getIndex("123: jdsnfksjnfkjsd")
     
         self.decks = qtw.QListWidget()
 
@@ -151,13 +150,13 @@ class deckMenu(qtw.QWidget):
         sql = f'''SELECT * FROM decks WHERE UID = "{self.ID}"'''
         decks =userdb_connect.execute(sql)
         self.deckL = [x for x in decks]
-        print(self.deckL)
         for i,j in enumerate(self.deckL):
             self.decks.addItem(f"{i+1}: {j[2]}")
         
     def openDeck(self):
         if self.decks.currentItem():
-            self.parentWidget().sDeck(self.decks.currentItem().text())
+            t = self.decks.currentItem().text()
+            self.parentWidget().sDeck(t[len(str(self.getIndex(t)))+2:])
         else:
             nodeck = qtw.QMessageBox()
             nodeck.setIcon(qtw.QMessageBox.Warning)
@@ -172,11 +171,10 @@ class deckMenu(qtw.QWidget):
     def newDeck(self):
         text, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the deck", "Deck Name:")
         if ok and text:
-            self.parentWidget().cDeck(text)
+            self.parentWidget().cDeck(text,-1)
 
     def removeDeck(self):
         if self.decks.currentItem():
-            print(f"deleting {self.decks.currentItem().text()}")
             ind = (self.getIndex(self.decks.currentItem().text()))
             b = self.deckL[ind]
             sql = f'''DELETE FROM decks WHERE DID = "{b[0]}"'''
@@ -214,25 +212,46 @@ class selDeck(qtw.QWidget):
         self.setLayout(self.gLayout)
 
     def decksel(self):
-        self.parentWidget().decksel()
+        self.parentWidget().deckSel()
 
 class createDeck(qtw.QWidget):
-    def __init__(self, name, ID):
+    def __init__(self, name, ID, new):
         super().__init__()
         self.ID = ID
         self.dName = name
+        self.new = new
         self.gLayout = qtw.QGridLayout()
 
         self.deckSelect = qtw.QPushButton("Return to Deck Select")
         self.deckSelect.clicked.connect(self.deckSel)
 
-        
+        self.promptLabel = qtw.QLabel("Relevant question/prompt")
+        self.contentLabel = qtw.QLabel("Content")
 
-        self.gLayout.addWidget(self.deckSelect,0,0,1,1)
-        self.createSQL()
+        self.titleLE = qtw.QLineEdit()
+        self.contentTE = qtw.QTextEdit()
+
+        self.nextB = qtw.QPushButton("Save/Next Card")
+        self.nextB.clicked.connect(self.next)
+
+        self.titleLE.setPlaceholderText("Prompt e.g. 'What is the powerhouse of the cell?'")
+        self.contentTE.setPlaceholderText("Content e.g. 'An organelle found in large numbers in most cells, in which the biochemical processes of respiration and energy production occur. It has a double membrane, the inner part being folded inwards to form layers (cristae).'")
+
+        self.gLayout.addWidget(self.promptLabel,0,0,1,1)
+        self.gLayout.addWidget(self.titleLE,1,0,1,2)
+        self.gLayout.addWidget(self.contentLabel,2,0,1,1)
+        self.gLayout.addWidget(self.contentTE,3,0,1,2)
+        self.gLayout.addWidget(self.nextB,4,0,1,1)
+        self.gLayout.addWidget(self.deckSelect,4,1,1,1)
+
+        if self.new == -1:
+            self.createSQL()
 
         self.setLayout(self.gLayout)
 
+    def next(self):
+        pass
+    
     def deckSel(self):
         self.parentWidget().deckSel()
 
@@ -240,6 +259,10 @@ class createDeck(qtw.QWidget):
         sql = ''' INSERT INTO decks (UID, deckName) VALUES(?,?)'''
         userdb_connect.execute(sql, (self.ID,self.dName))
         userdb_connect.commit()
+
+        sql = f''' SELECT * FROM decks WHERE deckName = "{self.dName}"'''
+        self.DID = [x for x in userdb_connect.execute(sql)][0][0]
+        
 
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
@@ -260,9 +283,9 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle(dName)
         self.setCentralWidget(selDeck(dName))
 
-    def cDeck(self, dName):
+    def cDeck(self, dName, new):
         self.setWindowTitle(f"Edit: {dName}")
-        self.setCentralWidget(createDeck(dName,self.ID))
+        self.setCentralWidget(createDeck(dName,self.ID , new))
 
 
 def main():
