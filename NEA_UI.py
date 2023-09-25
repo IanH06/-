@@ -246,6 +246,8 @@ class createDeck(qtw.QWidget):
 
         if self.new == -1:
             self.createSQL()
+        else:
+            self.DID = self.new
 
         self.setLayout(self.gLayout)
 
