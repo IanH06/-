@@ -157,7 +157,7 @@ class deckMenu(qtw.QWidget):
         
     def openDeck(self):
         if self.decks.currentItem():
-            self.parentWidget().sDeck()
+            self.parentWidget().sDeck(self.decks.currentItem().text())
         else:
             nodeck = qtw.QMessageBox()
             nodeck.setIcon(qtw.QMessageBox.Warning)
@@ -201,11 +201,20 @@ class deckMenu(qtw.QWidget):
 
     
 class selDeck(qtw.QWidget):
-    def __init__(self):
+    def __init__(self, dName):
         super().__init__()
         self.gLayout = qtw.QGridLayout()
+        self.dName = dName
+
+        self.deckSelect = qtw.QPushButton("Return to Deck Select")
+        self.deckSelect.clicked.connect(self.decksel)
+
+        self.gLayout.addWidget(self.deckSelect,0,0,1,1)
 
         self.setLayout(self.gLayout)
+
+    def decksel(self):
+        self.parentWidget().decksel()
 
 class createDeck(qtw.QWidget):
     def __init__(self, name, ID):
@@ -216,6 +225,8 @@ class createDeck(qtw.QWidget):
 
         self.deckSelect = qtw.QPushButton("Return to Deck Select")
         self.deckSelect.clicked.connect(self.deckSel)
+
+        
 
         self.gLayout.addWidget(self.deckSelect,0,0,1,1)
         self.createSQL()
@@ -245,13 +256,13 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle("Note Taking App")
         self.setCentralWidget(mainMenu())
 
-    def sDeck(self):
-        self.setWindowTitle("Deck Selection")
-        self.setCentralWidget(selDeck())
+    def sDeck(self, dName):
+        self.setWindowTitle(dName)
+        self.setCentralWidget(selDeck(dName))
 
-    def cDeck(self, name):
-        self.setWindowTitle(f"{name}'s Decks")
-        self.setCentralWidget(createDeck(name,self.ID))
+    def cDeck(self, dName):
+        self.setWindowTitle(f"Edit: {dName}")
+        self.setCentralWidget(createDeck(dName,self.ID))
 
 
 def main():
