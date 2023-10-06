@@ -11,7 +11,8 @@ userTable  = """CREATE TABLE users (
 deckTable = """CREATE TABLE decks (
     DID INTEGER PRIMARY KEY AUTOINCREMENT,
     UID TEXT    REFERENCES users (UID) ON DELETE CASCADE,
-    deckName TEXT 
+    deckName TEXT,
+    summary TEXT
 );"""
 
 notesTable = """CREATE TABLE notes (

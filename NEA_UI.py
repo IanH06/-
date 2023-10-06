@@ -168,7 +168,7 @@ class deckMenu(qtw.QWidget):
         if self.decks.currentItem():
             t = self.decks.currentItem().text()
             DID = self.deckL[getIndex(t)][0]
-            self.parentWidget().sDeck(t[len(str(getIndex(t)))+2:],DID)
+            self.parentWidget().sDeck(DID)
         else:
             nodeck = qtw.QMessageBox()
             nodeck.setIcon(qtw.QMessageBox.Warning)
@@ -216,7 +216,10 @@ class selDeck(qtw.QWidget):
         self.dName = dName
         self.DID = DID
 
+        self.sumLabel = qtw.QLabel()    
+        self.summaryLabel()
         self.label = qtw.QLabel(f" Deck:{self.dName}")
+        
 
         self.deckSelect = qtw.QPushButton("Return")
         self.deckSelect.clicked.connect(self.decksel)
@@ -230,25 +233,46 @@ class selDeck(qtw.QWidget):
         self.edit = qtw.QPushButton("Edit/Add notes")
         self.edit.clicked.connect(self.editDeck)
 
-        self.gLayout.addWidget(self.label,0,0,1,4)
-        self.gLayout.addWidget(self.deckSelect,1,3,1,1)
-        self.gLayout.addWidget(self.viewN,1,1,1,1)
-        self.gLayout.addWidget(self.study,1,2,1,1)
-        self.gLayout.addWidget(self.edit,1,0,1,1)
+        self.addSummary = qtw.QPushButton("Edit/Add Summary")
+        self.addSummary.clicked.connect(self.summary)
+
+        self.gLayout.addWidget(self.sumLabel,1,0,1,5)
+        self.gLayout.addWidget(self.label,0,0,1,5)
+        self.gLayout.addWidget(self.deckSelect,2,4,1,1)
+        self.gLayout.addWidget(self.addSummary,2,1,1,1)
+        self.gLayout.addWidget(self.viewN,2,2,1,1)
+        self.gLayout.addWidget(self.study,2,3,1,1)
+        self.gLayout.addWidget(self.edit,2,0,1,1)
 
         self.setLayout(self.gLayout)
+
+
+    def summary(self):
+        text, ok =  qtw.QInputDialog.getText(self, "Enter Topic Summary", "Summary:")
+        if ok and not text == "":
+            sql = f"""UPDATE decks SET  summary = '{text}' WHERE DID = {self.DID} """
+            userdb_connect.execute(sql)
+            userdb_connect.commit()
+            self.summaryLabel()
 
     def decksel(self):
         self.parentWidget().deckSel()
 
     def vNote(self):
-        self.parentWidget().vNote(self.dName,self.DID)
+        self.parentWidget().vNote(self.DID)
 
     def studyDeck(self):
         pass
 
     def editDeck(self):
-        self.parentWidget().eDeck(self.dName, self.DID)
+        self.parentWidget().eDeck(self.DID)
+
+    def summaryLabel(self):
+        sql = f"""SELECT summary FROM decks WHERE DID = {self.DID}"""
+        self.sum = [x for x in userdb_connect.execute(sql)][0][0]
+        if not self.sum:
+            self.sum = "Deck Summary e.g. 'Cells are the building blocks of life. All living organisms are made up of cells. Cells need to be viewed through a microscope. Cell membrane Controls entry and exit of substances such as oxygen and carbon dioxide.'"
+        self.sumLabel.setText(f"Summary:\n{self.sum}")
 
 class editDeck(qtw.QWidget):
     def __init__(self, name, ID, DID, edit=False):
@@ -297,7 +321,7 @@ class editDeck(qtw.QWidget):
         self.setLayout(self.gLayout)
 
     def vNotes(self):
-        self.parentWidget().vNote(self.dName,self.DID)
+        self.parentWidget().vNote(self.DID)
 
     def next(self):
         if not self.contentTE.toPlainText() or not self.titleLE.text():
@@ -329,7 +353,7 @@ class editDeck(qtw.QWidget):
                 
     
     def sDeck(self):
-        self.parentWidget().sDeck(self.dName,self.DID)
+        self.parentWidget().sDeck(self.DID)
 
     def createSQL(self):
         sql = ''' INSERT INTO decks (UID, deckName) VALUES(?,?)'''
@@ -365,7 +389,7 @@ class notesList(qtw.QWidget):
         self.setLayout(self.gLayout)
 
     def deckE(self):
-        self.parentWidget().eDeck(self.dName,self.DID)
+        self.parentWidget().sDeck(self.DID)
 
     def notesList(self):
         sql = f'''SELECT * FROM notes WHERE DID = {self.DID}'''
@@ -375,7 +399,10 @@ class notesList(qtw.QWidget):
     def editNote(self):
         ind = (getIndex(self.notes.currentItem().text()))
         note = (self.nList[ind])
-        self.parentWidget().eDeck(self.dName,self.DID,note)
+        self.parentWidget().eDeck(self.DID,note)
+
+class studyNotes(qtw.QWidget):
+    pass
 
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
@@ -392,16 +419,24 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle("Note Taking App")
         self.setCentralWidget(mainMenu())
 
-    def sDeck(self, dName, DID):
-        self.setWindowTitle(f"Deck: {dName}")
-        self.setCentralWidget(selDeck(dName, DID))
+    def sDeck(self, DID):
+        self.setWindowTitle(f"Deck: {getdName(DID)}")
+        self.setCentralWidget(selDeck(getdName(DID), DID))
 
-    def eDeck(self, dName, DID, edit = False):
-        self.setWindowTitle(f"Edit: {dName}")
-        self.setCentralWidget(editDeck(dName,self.ID , DID, edit))
+    def eDeck(self, DID, edit = False):
+        self.setWindowTitle(f"Edit: {getdName(DID)}")
+        self.setCentralWidget(editDeck(getdName(DID),self.ID , DID, edit))
 
-    def vNote(self,dName, DID):
-        self.setCentralWidget(notesList(dName, DID))
+    def vNote(self, DID):
+        self.setCentralWidget(notesList(getdName(DID), DID))
+
+    def study(self, DID):
+        self.setCentralWidget(studyNotes())
+
+
+def getdName(DID):
+    sql = f"""SELECT deckName FROM decks WHERE DID = '{DID}'"""
+    return [x for x in (userdb_connect.execute(sql))][0][0]
 
 def main():
     app = qtw.QApplication([])
