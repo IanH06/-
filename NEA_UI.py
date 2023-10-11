@@ -450,6 +450,10 @@ class studying(qtw.QWidget):
         self.Return =  qtw.QPushButton("Return")
         self.Return.clicked.connect(self.deckSel)
 
+        self.flip = qtw.QPushButton("Flip Flashcard")
+        
+        self.nextCard = qtw.QPushButton("Next Button ")
+
         self.tryTest = qtw.QPushButton("Test Yourself")
         self.tryTest.clicked.connect(self.testMode)
 
