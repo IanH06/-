@@ -1,7 +1,8 @@
-import typing
+
 from PyQt5 import QtCore
 import PyQt5.QtWidgets as qtw
 import sqlite3
+import random
 
 from PyQt5.QtWidgets import QWidget
 
@@ -262,7 +263,7 @@ class selDeck(qtw.QWidget):
         self.parentWidget().vNote(self.DID)
 
     def studyDeck(self):
-        pass
+        self.parentWidget().oStudy(self.DID)
 
     def editDeck(self):
         self.parentWidget().eDeck(self.DID)
@@ -401,8 +402,70 @@ class notesList(qtw.QWidget):
         note = (self.nList[ind])
         self.parentWidget().eDeck(self.DID,note)
 
-class studyNotes(qtw.QWidget):
-    pass
+class studyOptions(qtw.QWidget):
+    def __init__(self , dName , DID):
+        super().__init__()
+        self.dName = dName
+        self.DID = DID
+        self.gLayout =  qtw.QGridLayout()
+        self.notes = self.getNotes()
+
+        self.lab = qtw.QLabel("Select an option to study/test:")
+
+        self.go = qtw.QPushButton("Start Study | Test")
+        self.go.clicked.connect(self.start)
+
+        self.options = qtw.QComboBox()
+        self.options.addItems(["Learn Notes","Take a Test"])
+
+        self.Return = qtw.QPushButton("Return")
+        self.Return.clicked.connect(self.sDeck)
+
+        self.gLayout.addWidget(self.lab,0,0,1,2)
+        self.gLayout.addWidget(self.options,1,0,1,2)
+        self.gLayout.addWidget(self.Return,2,0,1,1)
+        self.gLayout.addWidget(self.go,2,1,1,1)
+        self.setLayout(self.gLayout)
+
+    def start(self):
+        i = (self.options.currentIndex())
+        self.parentWidget().study(i,self.DID)
+
+    def getNotes(self):
+        sql = f"""SELECT * FROM notes WHERE DID = '{self.DID}'"""
+        c = userdb_connect.execute(sql)
+        return [x for x in c]
+
+    def sDeck(self):
+        self.parentWidget().sDeck(self.DID)
+
+class studying(qtw.QWidget):
+    def __init__(self,mode, DID, dName):
+        super().__init__()
+        self.gLayout = qtw.QGridLayout()
+        self.mode = mode
+        self.DID =  DID
+        self.dName = dName
+
+        self.Return =  qtw.QPushButton("Return")
+        self.Return.clicked.connect(self.deckSel)
+
+        self.tryTest = qtw.QPushButton("Test Yourself")
+        self.tryTest.clicked.connect(self.testMode)
+
+        if self.mode == 0:
+            self.gLayout.addWidget(self.tryTest,1,0,1,1)
+        self.gLayout.addWidget(self.Return,1,1,1,1)
+
+        self.setLayout(self.gLayout)
+
+    def testMode(self):
+        self.parentWidget().study(1,self.DID)
+
+    def deckSel(self):
+        self.parentWidget().sDeck(self.DID)
+
+    
 
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
@@ -430,8 +493,16 @@ class MainWindow(qtw.QMainWindow):
     def vNote(self, DID):
         self.setCentralWidget(notesList(getdName(DID), DID))
 
-    def study(self, DID):
-        self.setCentralWidget(studyNotes())
+    def oStudy(self, DID):
+        self.setWindowTitle(f"Select Option To Study: {getdName(DID)}")
+        self.setCentralWidget(studyOptions(getdName(DID),DID))
+
+    def study(self,mode,DID):
+        if mode == 0:
+            self.setWindowTitle(f"Learning notes in: {getdName(DID)}")
+        elif mode == 1:
+            self.setWindowTitle(f"Testing notes in: {getdName(DID)}")
+        self.setCentralWidget(studying(mode,DID,getdName(DID)))
 
 
 def getdName(DID):
