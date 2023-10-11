@@ -1,4 +1,4 @@
-from NEA_UI import main
+from NEA import main
 
 if __name__ == "__main__":
     main()
