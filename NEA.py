@@ -10,6 +10,11 @@ users_db = "users.db"
 userdb_connect = sqlite3.connect(users_db)
 userdb_connect.execute("PRAGMA foreign_keys = 1")
 
+def getNotes(DID):
+    sql = f"""SELECT * FROM notes WHERE DID = '{DID}'"""
+    c = userdb_connect.execute(sql)
+    return [x for x in c]
+
 def getNextUID():
     sql = """ SELECT * FROM users"""
     c = userdb_connect.execute(sql)
@@ -209,7 +214,6 @@ class deckMenu(qtw.QWidget):
             nodeck.setStandardButtons(qtw.QMessageBox.Ok)
             nodeck.exec()
     
-
 class selDeck(qtw.QWidget):
     def __init__(self, dName, DID):
         super().__init__()
@@ -371,7 +375,7 @@ class notesList(qtw.QWidget):
         self.dName = dName
         self.gLayout = qtw.QGridLayout()
 
-        self.nList = self.notesList()
+        self.nList = getNotes(self.DID)
         self.notes = qtw.QListWidget()
         for i,j in enumerate(self.nList):
             self.notes.addItem(f"{i+1}: {j[2]} | {j[3]}")
@@ -392,10 +396,6 @@ class notesList(qtw.QWidget):
     def deckE(self):
         self.parentWidget().sDeck(self.DID)
 
-    def notesList(self):
-        sql = f'''SELECT * FROM notes WHERE DID = {self.DID}'''
-        notes = userdb_connect.execute(sql)
-        return [x for x in notes]
     
     def editNote(self):
         ind = (getIndex(self.notes.currentItem().text()))
@@ -408,7 +408,7 @@ class studyOptions(qtw.QWidget):
         self.dName = dName
         self.DID = DID
         self.gLayout =  qtw.QGridLayout()
-        self.notes = self.getNotes()
+        self.notes = getNotes(self.DID)
 
         self.lab = qtw.QLabel("Select an option to study/test:")
 
@@ -431,11 +431,6 @@ class studyOptions(qtw.QWidget):
         i = (self.options.currentIndex())
         self.parentWidget().study(i,self.DID)
 
-    def getNotes(self):
-        sql = f"""SELECT * FROM notes WHERE DID = '{self.DID}'"""
-        c = userdb_connect.execute(sql)
-        return [x for x in c]
-
     def sDeck(self):
         self.parentWidget().sDeck(self.DID)
 
@@ -447,19 +442,35 @@ class studying(qtw.QWidget):
         self.DID =  DID
         self.dName = dName
 
+        self.notes =  getNotes(self.DID)
+        self.noteIndex = 0
+
         self.Return =  qtw.QPushButton("Return")
         self.Return.clicked.connect(self.deckSel)
 
         self.flip = qtw.QPushButton("Flip Flashcard")
         
-        self.nextCard = qtw.QPushButton("Next Button ")
+        self.nextCard = qtw.QPushButton("Next")
+        self.nextCard.clicked.connect(self.next)
+
+        self.prevCard = qtw.QPushButton("Previous")
+        self.prevCard.clicked.connect(self.prev)
+
+        self.titleText = qtw.QLabel(f"Title: {self.notes[self.noteIndex][2]}")
+        self.content = qtw.QLabel(f"Content: {self.notes[self.noteIndex][3]}")
+
+
 
         self.tryTest = qtw.QPushButton("Test Yourself")
         self.tryTest.clicked.connect(self.testMode)
 
         if self.mode == 0:
-            self.gLayout.addWidget(self.tryTest,1,0,1,1)
-        self.gLayout.addWidget(self.Return,1,1,1,1)
+            self.gLayout.addWidget(self.tryTest,3,0,1,1)
+            self.gLayout.addWidget(self.titleText,0,0,1,2)
+            self.gLayout.addWidget(self.content,1,0,1,2)
+            self.gLayout.addWidget(self.nextCard,2,1,1,1)
+            self.gLayout.addWidget(self.prevCard,2,0,1,1)
+        self.gLayout.addWidget(self.Return,3,1,1,1)
 
         self.setLayout(self.gLayout)
 
@@ -469,6 +480,23 @@ class studying(qtw.QWidget):
     def deckSel(self):
         self.parentWidget().sDeck(self.DID)
 
+    def updateLabels(self):
+        self.titleText.setText(f"Title: {self.notes[self.noteIndex][2]}")
+        self.content.setText(f"Content: {self.notes[self.noteIndex][3]}")
+
+    def next(self):
+        if self.noteIndex + 1 >= len(self.notes):
+            self.noteIndex = 0 
+        else:
+            self.noteIndex += 1
+        self.updateLabels()
+
+    def prev(self):
+        if self.noteIndex <= 0:
+            self.noteIndex = len(self.notes)-1
+        else:
+            self.noteIndex -= 1
+        self.updateLabels()
     
 
 class MainWindow(qtw.QMainWindow):
