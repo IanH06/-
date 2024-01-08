@@ -1,10 +1,6 @@
-
-from PyQt5 import QtCore
 import PyQt5.QtWidgets as qtw
 import sqlite3
 import random
-
-from PyQt5.QtWidgets import QWidget
 
 users_db = "users.db"
 userdb_connect = sqlite3.connect(users_db)
@@ -36,18 +32,22 @@ def getIndex(a):
         text += i
     return int(text) -1
 
-class mainMenu(qtw.QWidget):
+class startMenu(qtw.QWidget):   
     def __init__(self):
         super().__init__()
 
-        self.userID = None
+
         self.menuGrid = qtw.QGridLayout()
 
         self.user_list  = qtw.QComboBox()
+
         sql = """ SELECT * FROM users"""
         c = userdb_connect.execute(sql)
+        count = 1
         for i in c:
             self.user_list.addItem(f"{i[1]} [{i[0]}]")
+            self.userID = i[0]
+            count += 1
 
         self.sUser = qtw.QLabel("Select User:")
         self.newUser = qtw.QLabel("Add a New User:")
@@ -62,7 +62,7 @@ class mainMenu(qtw.QWidget):
         self.removeUser.clicked.connect(self.remove)
 
         self.startB = qtw.QPushButton("Start")
-        self.startB.clicked.connect(self.parent)
+        self.startB.clicked.connect(self.deckSelect)
 
         self.menuGrid.addWidget(self.sUser,0,0,1,3)
         self.menuGrid.addWidget(self.newUser,2,0,1,3)
@@ -74,15 +74,9 @@ class mainMenu(qtw.QWidget):
 
         self.setLayout(self.menuGrid)
 
-    def parent(self):
-        self.parentWidget().ID = self.user_list.currentText()[-5:-1]
-        self.parentWidget().deckSel()
+    def deckSelect(self):
+        self.parentWidget().deckSel(self.user_list.currentText()[-5:-1])
 
-    def getUserDecks(self):
-        getdecks = f''' SELECT * FROM decks WHERE UID ="{self.userID}" '''
-        c =  userdb_connect.execute(getdecks)
-        l = [x for x in c]
-        return l
     
     def addUser(self):
         nextID = getNextUID()
@@ -111,31 +105,17 @@ class mainMenu(qtw.QWidget):
         if returnval == qtw.QMessageBox.Ok:
             self.deleteUser()
 
-    def deckList(self):
-        if not self.user_list.currentText:
-            no_name = qtw.QMessageBox()
-            no_name.setIcon(qtw.QMessageBox.Warning)
-            no_name.setText(f"There is no user selected")
-            no_name.setWindowTitle("No User Selected")
-            no_name.setStandardButtons(qtw.QMessageBox.Ok)
-            no_name.exec()
-        else:
-            self.userID = self.user_list.currentText()[-5:-1]
-            for i in self.getUserDecks():
-                self.decks.addItem(i[2])
-            self.setCentralWidget(self.WDeck)
-
     def deleteUser(self):
-        ID = self.user_list.currentText()[-5:-1]
-        sql = f''' DELETE FROM users WHERE UID="{ID}"'''
+        self.userID = self.user_list.currentText()[-5:-1]
+        sql = f''' DELETE FROM users WHERE UID="{self.userID}"'''
         userdb_connect.execute(sql)
         userdb_connect.commit()
         self.user_list.removeItem(self.user_list.currentIndex())
 
 class deckMenu(qtw.QWidget):
-    def __init__(self,a):
+    def __init__(self,ID):
         super().__init__()
-        self.ID = a
+        self.ID = ID
         self.deckSelect = qtw.QGridLayout()
     
         self.decks = qtw.QListWidget()
@@ -189,7 +169,14 @@ class deckMenu(qtw.QWidget):
     def newDeck(self):
         text, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the deck", "Deck Name:")
         if ok and text:
-            self.parentWidget().eDeck(text,-1)
+            sql = ''' INSERT INTO decks (UID, deckName) VALUES(?,?)'''
+            userdb_connect.execute(sql, (self.ID,text))
+            userdb_connect.commit()
+
+            sql = f''' SELECT * FROM decks WHERE deckName = "{text}"'''
+            DID = [x for x in userdb_connect.execute(sql)][-1][0]
+            self.parentWidget().eDeck(DID)
+
 
     def removeDeck(self):
         if self.decks.currentItem():
@@ -267,7 +254,17 @@ class selDeck(qtw.QWidget):
         self.parentWidget().vNote(self.DID)
 
     def studyDeck(self):
-        self.parentWidget().oStudy(self.DID)
+        if getNotes(self.DID):
+            #self.parentWidget().oStudy(self.DID)
+            self.parentWidget().study(0,self.DID)
+
+        else:
+            emptydeck = qtw.QMessageBox()
+            emptydeck.setIcon(qtw.QMessageBox.Warning)
+            emptydeck.setText(f"This deck is empty, add notes to the deck to study")
+            emptydeck.setWindowTitle("Empty Deck")
+            emptydeck.setStandardButtons(qtw.QMessageBox.Ok)
+            emptydeck.exec()  
 
     def editDeck(self):
         self.parentWidget().eDeck(self.DID)
@@ -276,7 +273,7 @@ class selDeck(qtw.QWidget):
         sql = f"""SELECT summary FROM decks WHERE DID = {self.DID}"""
         self.sum = [x for x in userdb_connect.execute(sql)][0][0]
         if not self.sum:
-            self.sum = "Deck Summary e.g. 'Cells are the building blocks of life. All living organisms are made up of cells. Cells need to be viewed through a microscope. Cell membrane Controls entry and exit of substances such as oxygen and carbon dioxide.'"
+            self.sum = "No Deck Summary\nDeck Summary e.g. 'Cells are the building blocks of life. All living organisms are made up of cells. Cells need to be viewed through a microscope. Cell membrane Controls entry and exit of substances such as oxygen and carbon dioxide.'"
         self.sumLabel.setText(f"Summary:\n{self.sum}")
 
 class editDeck(qtw.QWidget):
@@ -320,9 +317,6 @@ class editDeck(qtw.QWidget):
         self.gLayout.addWidget(self.nextB,4,0,1,1)
         self.gLayout.addWidget(self.deckSelect,4,2,1,1)
 
-        if self.DID == -1:
-            self.createSQL()
-
         self.setLayout(self.gLayout)
 
     def vNotes(self):
@@ -330,12 +324,12 @@ class editDeck(qtw.QWidget):
 
     def next(self):
         if not self.contentTE.toPlainText() or not self.titleLE.text():
-            nodeck = qtw.QMessageBox()
-            nodeck.setIcon(qtw.QMessageBox.Warning)
-            nodeck.setText(f"There are empty field(s)")
-            nodeck.setWindowTitle("Empty Fields")
-            nodeck.setStandardButtons(qtw.QMessageBox.Ok)
-            nodeck.exec()
+            emptyfields = qtw.QMessageBox()
+            emptyfields.setIcon(qtw.QMessageBox.Warning)
+            emptyfields.setText(f"There are empty field(s)")
+            emptyfields.setWindowTitle("Empty Fields")
+            emptyfields.setStandardButtons(qtw.QMessageBox.Ok)
+            emptyfields.exec()
         else:
             if not self.NID:
                 sql = '''INSERT INTO notes (DID, Title, Content) VALUES(?,?,?)'''
@@ -359,14 +353,6 @@ class editDeck(qtw.QWidget):
     
     def sDeck(self):
         self.parentWidget().sDeck(self.DID)
-
-    def createSQL(self):
-        sql = ''' INSERT INTO decks (UID, deckName) VALUES(?,?)'''
-        userdb_connect.execute(sql, (self.ID,self.dName))
-        userdb_connect.commit()
-
-        sql = f''' SELECT * FROM decks WHERE deckName = "{self.dName}"'''
-        self.DID = [x for x in userdb_connect.execute(sql)][0][0]
         
 class notesList(qtw.QWidget):
     def __init__(self, dName, DID):
@@ -378,7 +364,7 @@ class notesList(qtw.QWidget):
         self.nList = getNotes(self.DID)
         self.notes = qtw.QListWidget()
         for i,j in enumerate(self.nList):
-            self.notes.addItem(f"{i+1}: {j[2]} | {j[3]}")
+            self.notes.addItem(f"{i+1}: {j[2]}:\n{j[3]}")
 
         self.nLabel =  qtw.QLabel("List of notes:")
 
@@ -402,45 +388,15 @@ class notesList(qtw.QWidget):
         note = (self.nList[ind])
         self.parentWidget().eDeck(self.DID,note)
 
-class studyOptions(qtw.QWidget):
-    def __init__(self , dName , DID):
-        super().__init__()
-        self.dName = dName
-        self.DID = DID
-        self.gLayout =  qtw.QGridLayout()
-        self.notes = getNotes(self.DID)
-
-        self.lab = qtw.QLabel("Select an option to study/test:")
-
-        self.go = qtw.QPushButton("Start Study | Test")
-        self.go.clicked.connect(self.start)
-
-        self.options = qtw.QComboBox()
-        self.options.addItems(["Learn Notes","Take a Test"])
-
-        self.Return = qtw.QPushButton("Return")
-        self.Return.clicked.connect(self.sDeck)
-
-        self.gLayout.addWidget(self.lab,0,0,1,2)
-        self.gLayout.addWidget(self.options,1,0,1,2)
-        self.gLayout.addWidget(self.Return,2,0,1,1)
-        self.gLayout.addWidget(self.go,2,1,1,1)
-        self.setLayout(self.gLayout)
-
-    def start(self):
-        i = (self.options.currentIndex())
-        self.parentWidget().study(i,self.DID)
-
-    def sDeck(self):
-        self.parentWidget().sDeck(self.DID)
-
 class studying(qtw.QWidget):
     def __init__(self,mode, DID, dName):
         super().__init__()
+        print(mode)
         self.gLayout = qtw.QGridLayout()
         self.mode = mode
         self.DID =  DID
         self.dName = dName
+
 
         self.notes =  getNotes(self.DID)
         self.noteIndex = 0
@@ -456,9 +412,19 @@ class studying(qtw.QWidget):
         self.prevCard = qtw.QPushButton("Previous")
         self.prevCard.clicked.connect(self.prev)
 
-        self.titleText = qtw.QLabel(f"Title: {self.notes[self.noteIndex][2]}")
-        self.content = qtw.QLabel(f"Content: {self.notes[self.noteIndex][3]}")
+        self.titleText = qtw.QLabel(f"Title:\n{self.notes[self.noteIndex][2]}")
+        self.content = qtw.QLabel(f"Content:\n{self.notes[self.noteIndex][3]}")
 
+        self.ans = qtw.QLineEdit()
+        self.ans.setPlaceholderText("Answer:")
+        self.ans.returnPressed.connect(self.enter)
+
+        self.confirm = qtw.QPushButton("Enter")
+        self.confirm.clicked.connect(self.enter)
+
+        self.prompt = qtw.QLabel()
+
+        self.understanding = qtw.QLabel()
 
 
         self.tryTest = qtw.QPushButton("Test Yourself")
@@ -470,9 +436,87 @@ class studying(qtw.QWidget):
             self.gLayout.addWidget(self.content,1,0,1,2)
             self.gLayout.addWidget(self.nextCard,2,1,1,1)
             self.gLayout.addWidget(self.prevCard,2,0,1,1)
+        elif self.mode == 1:
+            self.untested = self.notes.copy()
+            self.half = []
+            self.known = []
+            self.update()
+            self.gLayout.addWidget(self.ans,2,0,1,2)
+            self.gLayout.addWidget(self.confirm,3,0,1,1)
+            self.gLayout.addWidget(self.understanding,0,0,1,1)
+            self.gLayout.addWidget(self.prompt,1,0,1,1)
+            
         self.gLayout.addWidget(self.Return,3,1,1,1)
 
         self.setLayout(self.gLayout)
+
+    def update(self):
+        self.ans.clear()
+        self.understanding.setText(f"Unleanrt :{len(self.untested)}\nHalf learnt :{len(self.half)}\nFully learn :{len(self.known)}")
+        self.current = ["-","-","Placeholder","Placeholder"]
+        if self.untested:
+            self.current = random.choice(self.untested)
+        elif self.half:
+            self.current = random.choice(self.half)
+        else:
+            done = qtw.QMessageBox()
+            done.setIcon(qtw.QMessageBox.Warning)
+            done.setText(f"Congratulations! You have finished studying for the whole deck!\nReturning to previous page.")
+            done.setWindowTitle("Done!")
+            done.addButton("Ok", qtw.QMessageBox.YesRole)
+            done.exec()
+            self.parentWidget().oStudy(self.DID)
+        self.prompt.setText(self.current[2])
+
+            
+        
+
+    def enter(self):
+        def clicked(btn):
+            txt  = btn.text()
+            if txt == "Wrong":
+                self.update()
+            elif txt == "Half Right":
+                if self.current in self.untested:
+                    self.untested.remove(self.current)
+                    self.half.append(self.current)
+                self.update()
+            elif txt == "Close Enough" or txt == "Nice":
+                if self.current in self.untested:
+                    self.untested.remove(self.current)
+                else:
+                    self.half.remove(self.current)
+                self.known.append(self.current)
+                self.update()
+
+        if not self.ans.text():
+            ent = qtw.QMessageBox()
+            ent.setIcon(qtw.QMessageBox.Warning)
+            ent.setText(f"Please enter the solution to the prompt!")
+            ent.setWindowTitle("Please provide an answer")
+            ent.addButton("Ok", qtw.QMessageBox.YesRole)
+            ent.buttonClicked.connect(clicked)
+            ent.exec()
+        else:
+            if self.current[3] == self.ans.text():
+                ent = qtw.QMessageBox()
+                ent.setIcon(qtw.QMessageBox.Information)
+                ent.setText(f"That is correct!")
+                ent.setWindowTitle("Correct!")
+                ent.addButton("Nice", qtw.QMessageBox.YesRole)
+                ent.buttonClicked.connect(clicked)
+                ent.exec()
+            else:
+                ent = qtw.QMessageBox()
+                ent.setIcon(qtw.QMessageBox.Question)
+                ent.setWindowTitle("Accuracy of the answer?")
+                ent.setText(f"The answer was supposed to be: {self.current[3]}\n\nYou entered: {self.ans.text()}")
+                ent.addButton("Wrong", qtw.QMessageBox.YesRole)
+                ent.addButton("Half Right", qtw.QMessageBox.YesRole)
+                ent.addButton("Close Enough", qtw.QMessageBox.YesRole)
+                ent.buttonClicked.connect(clicked)
+                ent.exec()
+
 
     def testMode(self):
         self.parentWidget().study(1,self.DID)
@@ -481,8 +525,8 @@ class studying(qtw.QWidget):
         self.parentWidget().sDeck(self.DID)
 
     def updateLabels(self):
-        self.titleText.setText(f"Title: {self.notes[self.noteIndex][2]}")
-        self.content.setText(f"Content: {self.notes[self.noteIndex][3]}")
+        self.titleText.setText(f"Title:\n{self.notes[self.noteIndex][2]}")
+        self.content.setText(f"Content:\n{self.notes[self.noteIndex][3]}")
 
     def next(self):
         if self.noteIndex + 1 >= len(self.notes):
@@ -503,16 +547,16 @@ class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
         self.ID = None
-        self.setWindowTitle("Note Taking App")
-        self.setCentralWidget(mainMenu())
+        self.setWindowTitle("Revision Tool")
+        self.setCentralWidget(startMenu())
     
-    def deckSel(self):
+    def deckSel(self,ID):
         self.setWindowTitle("Deck Selection")
-        self.setCentralWidget(deckMenu(self.ID))
+        self.setCentralWidget(deckMenu(ID))
 
     def menuSel(self):
-        self.setWindowTitle("Note Taking App")
-        self.setCentralWidget(mainMenu())
+        self.setWindowTitle("Revision Tool")
+        self.setCentralWidget(startMenu())
 
     def sDeck(self, DID):
         self.setWindowTitle(f"Deck: {getdName(DID)}")
@@ -524,10 +568,6 @@ class MainWindow(qtw.QMainWindow):
 
     def vNote(self, DID):
         self.setCentralWidget(notesList(getdName(DID), DID))
-
-    def oStudy(self, DID):
-        self.setWindowTitle(f"Select Option To Study: {getdName(DID)}")
-        self.setCentralWidget(studyOptions(getdName(DID),DID))
 
     def study(self,mode,DID):
         if mode == 0:
