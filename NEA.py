@@ -403,8 +403,6 @@ class studying(qtw.QWidget):
 
         self.Return =  qtw.QPushButton("Return")
         self.Return.clicked.connect(self.deckSel)
-
-        self.flip = qtw.QPushButton("Flip Flashcard")
         
         self.nextCard = qtw.QPushButton("Next")
         self.nextCard.clicked.connect(self.next)
@@ -446,8 +444,7 @@ class studying(qtw.QWidget):
             self.gLayout.addWidget(self.understanding,0,0,1,1)
             self.gLayout.addWidget(self.prompt,1,0,1,1)
             
-        self.gLayout.addWidget(self.Return,3,1,1,1)
-
+        self.gLayout.addWidget(self.Return,3,1,1,1) 
         self.setLayout(self.gLayout)
 
     def update(self):
@@ -466,10 +463,7 @@ class studying(qtw.QWidget):
             done.addButton("Ok", qtw.QMessageBox.YesRole)
             done.exec()
             self.parentWidget().oStudy(self.DID)
-        self.prompt.setText(self.current[2])
-
-            
-        
+        self.prompt.setText(self.current[2])   
 
     def enter(self):
         def clicked(btn):
@@ -490,33 +484,32 @@ class studying(qtw.QWidget):
                 self.update()
 
         if not self.ans.text():
-            ent = qtw.QMessageBox()
-            ent.setIcon(qtw.QMessageBox.Warning)
-            ent.setText(f"Please enter the solution to the prompt!")
-            ent.setWindowTitle("Please provide an answer")
-            ent.addButton("Ok", qtw.QMessageBox.YesRole)
-            ent.buttonClicked.connect(clicked)
-            ent.exec()
+            MissingAnswer = qtw.QMessageBox()
+            MissingAnswer.setIcon(qtw.QMessageBox.Warning)
+            MissingAnswer.setText(f"Please MissingAnswerer the solution to the prompt!")
+            MissingAnswer.setWindowTitle("Please provide an answer")
+            MissingAnswer.addButton("Ok", qtw.QMessageBox.YesRole)
+            MissingAnswer.buttonClicked.connect(clicked)
+            MissingAnswer.exec()
         else:
             if self.current[3] == self.ans.text():
-                ent = qtw.QMessageBox()
-                ent.setIcon(qtw.QMessageBox.Information)
-                ent.setText(f"That is correct!")
-                ent.setWindowTitle("Correct!")
-                ent.addButton("Nice", qtw.QMessageBox.YesRole)
-                ent.buttonClicked.connect(clicked)
-                ent.exec()
+                CorrectAnswer = qtw.QMessageBox()
+                CorrectAnswer.setIcon(qtw.QMessageBox.Information)
+                CorrectAnswer.setText(f"That is correct!")
+                CorrectAnswer.setWindowTitle("Correct!")
+                CorrectAnswer.addButton("Nice", qtw.QMessageBox.YesRole)
+                CorrectAnswer.buttonClicked.connect(clicked)
+                CorrectAnswer.exec()
             else:
-                ent = qtw.QMessageBox()
-                ent.setIcon(qtw.QMessageBox.Question)
-                ent.setWindowTitle("Accuracy of the answer?")
-                ent.setText(f"The answer was supposed to be: {self.current[3]}\n\nYou entered: {self.ans.text()}")
-                ent.addButton("Wrong", qtw.QMessageBox.YesRole)
-                ent.addButton("Half Right", qtw.QMessageBox.YesRole)
-                ent.addButton("Close Enough", qtw.QMessageBox.YesRole)
-                ent.buttonClicked.connect(clicked)
-                ent.exec()
-
+                CheckAnswer = qtw.QMessageBox()
+                CheckAnswer.setIcon(qtw.QMessageBox.Question)
+                CheckAnswer.setWindowTitle("Accuracy of the answer?")
+                CheckAnswer.setText(f"The answer was supposed to be: {self.currCheckAnswer[3]}\n\nYou CheckAnswerered: {self.ans.text()}")
+                CheckAnswer.addButton("Wrong", qtw.QMessageBox.YesRole)
+                CheckAnswer.addButton("Half Right", qtw.QMessageBox.YesRole)
+                CheckAnswer.addButton("Close Enough", qtw.QMessageBox.YesRole)
+                CheckAnswer.buttonClicked.connect(clicked)
+                CheckAnswer.exec()
 
     def testMode(self):
         self.parentWidget().study(1,self.DID)
