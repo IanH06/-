@@ -1,28 +1,13 @@
 import PyQt5.QtWidgets as qtw
 import sqlite3
 import random
+import saveAndLoad
+import datetime
+from getFunctions import getNotes, getNextUID, getdName, getLatestDID
 
 users_db = "users.db"
 userdb_connect = sqlite3.connect(users_db)
 userdb_connect.execute("PRAGMA foreign_keys = 1")
-
-def getNotes(DID):
-    sql = f"""SELECT * FROM notes WHERE DID = '{DID}'"""
-    c = userdb_connect.execute(sql)
-    return [x for x in c]
-
-def getNextUID():
-    sql = """ SELECT * FROM users"""
-    c = userdb_connect.execute(sql)
-    l = [x[0] for x in c]
-    if l:
-        latest = l[-1]
-        latest  = str(int(latest.lstrip("0")) +1)
-        while len(latest) < 4:
-            latest = "0" + latest
-        return(latest)
-    else:
-        return "0001"
 
 def getIndex(a):
     text = ""
@@ -131,13 +116,17 @@ class deckMenu(qtw.QWidget):
         self.goBack = qtw.QPushButton("Return")
         self.goBack.clicked.connect(self.mainMenu)
 
+        self.loadDeck = qtw.QPushButton("Load")
+        self.loadDeck.clicked.connect(self.load)
+
         self.decks.doubleClicked.connect(self.openDeck)
 
-        self.deckSelect.addWidget(self.dLabel,0,0,1,3)
-        self.deckSelect.addWidget(self.decks,1,0,1,3)
+        self.deckSelect.addWidget(self.dLabel,0,0,1,2)
+        self.deckSelect.addWidget(self.decks,1,0,1,2)
         self.deckSelect.addWidget(self.editDeck,2,0,1,1)
         self.deckSelect.addWidget(self.deleteDeck,2,1,1,1)
-        self.deckSelect.addWidget(self.goBack,2,2,1,1)
+        self.deckSelect.addWidget(self.loadDeck,3,0,1,1)
+        self.deckSelect.addWidget(self.goBack,3,1,1,1)
         
         self.setLayout(self.deckSelect)
         self.getDeckList()
@@ -166,6 +155,29 @@ class deckMenu(qtw.QWidget):
     def mainMenu(self):
         self.parentWidget().menuSel()
 
+    def load(self):
+        fileName, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the file", "File Name:")
+        if ok and fileName:
+            loadedFile = saveAndLoad.loadJson(fileName) 
+            if loadedFile != "FileNotFound":
+                sql = '''INSERT INTO decks (UID, deckName, Summary) VALUES(?,?,?)'''
+                userdb_connect.execute(sql, (self.ID,loadedFile["deckName"], loadedFile["Summary"] ))
+                userdb_connect.commit()
+                latestDID = getLatestDID()
+                sql = '''INSERT INTO notes (DID, Title, Content) VALUES(?,?,?)'''
+                for x in loadedFile["Notes"]:
+                   userdb_connect.execute(sql, (latestDID ,x[2] ,x[3])) 
+                   userdb_connect.commit()
+                self.getDeckList()
+            else:
+                fileNotFound = qtw.QMessageBox()
+                fileNotFound.setIcon(qtw.QMessageBox.Warning)
+                fileNotFound.setText(f"File Not Found")
+                fileNotFound.setWindowTitle(f"There was no file with the name '{fileName}.json', please verify that the file name was entered correctly.")
+                fileNotFound.setStandardButtons(qtw.QMessageBox.Ok)
+                fileNotFound.exec()  
+
+
     def newDeck(self):
         text, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the deck", "Deck Name:")
         if ok and text:
@@ -183,7 +195,7 @@ class deckMenu(qtw.QWidget):
             delete = qtw.QMessageBox()
             delete.setIcon(qtw.QMessageBox.Warning)
             delete.setText(f"Are you sure you would like to remove the selected deck? \n{self.decks.currentItem().text()}")
-            delete.setWindowTitle("Remove User")
+            delete.setWindowTitle("Remove Deck")
             delete.setStandardButtons(qtw.QMessageBox.Ok | qtw.QMessageBox.Cancel)
             returnval = delete.exec()
             if returnval == qtw.QMessageBox.Ok:
@@ -214,7 +226,7 @@ class selDeck(qtw.QWidget):
         
 
         self.deckSelect = qtw.QPushButton("Return")
-        self.deckSelect.clicked.connect(self.decksel)
+        self.deckSelect.clicked.connect(self.deckSel)
 
         self.viewN = qtw.QPushButton("View Notes")
         self.viewN.clicked.connect(self.vNote)
@@ -228,16 +240,28 @@ class selDeck(qtw.QWidget):
         self.addSummary = qtw.QPushButton("Edit/Add Summary")
         self.addSummary.clicked.connect(self.summary)
 
+        self.saveDeck = qtw.QPushButton("Save This Deck")
+        self.saveDeck.clicked.connect(self.save)
+
         self.gLayout.addWidget(self.sumLabel,1,0,1,5)
         self.gLayout.addWidget(self.label,0,0,1,5)
-        self.gLayout.addWidget(self.deckSelect,2,4,1,1)
+        self.gLayout.addWidget(self.deckSelect,3,2,1,1)
         self.gLayout.addWidget(self.addSummary,2,1,1,1)
         self.gLayout.addWidget(self.viewN,2,2,1,1)
-        self.gLayout.addWidget(self.study,2,3,1,1)
+        self.gLayout.addWidget(self.study,3,0,1,1)
         self.gLayout.addWidget(self.edit,2,0,1,1)
+        self.gLayout.addWidget(self.saveDeck,3,1,1,1)
 
         self.setLayout(self.gLayout)
 
+    def save(self):
+        FName, ok =  qtw.QInputDialog.getText(self, "Please enter the name of the file to be saved, (leave empty for default name)", "Name:")
+        if ok:
+            if FName == "":
+                dateTime = (datetime.datetime.now().strftime("%Y%m%d"))
+                FName = self.dName + "-" + dateTime
+            saveAndLoad.deckToDict(self.DID, FName)
+        
 
     def summary(self):
         text, ok =  qtw.QInputDialog.getText(self, "Enter Topic Summary", "Summary:")
@@ -247,7 +271,7 @@ class selDeck(qtw.QWidget):
             userdb_connect.commit()
             self.summaryLabel()
 
-    def decksel(self):
+    def deckSel(self):
         self.parentWidget().deckSel()
 
     def vNote(self):
@@ -255,7 +279,6 @@ class selDeck(qtw.QWidget):
 
     def studyDeck(self):
         if getNotes(self.DID):
-            #self.parentWidget().oStudy(self.DID)
             self.parentWidget().study(0,self.DID)
 
         else:
@@ -277,7 +300,7 @@ class selDeck(qtw.QWidget):
         self.sumLabel.setText(f"Summary:\n{self.sum}")
 
 class editDeck(qtw.QWidget):
-    def __init__(self, name, ID, DID, edit=False):
+    def __init__(self, name, ID, DID, edit = False):
         super().__init__()
         self.NID = False
         self.ID = ID
@@ -391,7 +414,6 @@ class notesList(qtw.QWidget):
 class studying(qtw.QWidget):
     def __init__(self,mode, DID, dName):
         super().__init__()
-        print(mode)
         self.gLayout = qtw.QGridLayout()
         self.mode = mode
         self.DID =  DID
@@ -449,7 +471,7 @@ class studying(qtw.QWidget):
 
     def update(self):
         self.ans.clear()
-        self.understanding.setText(f"Unleanrt :{len(self.untested)}\nHalf learnt :{len(self.half)}\nFully learn :{len(self.known)}")
+        self.understanding.setText(f"Unleanrt :{len(self.untested)}\nHalf learnt :{len(self.half)}\nFully learnt :{len(self.known)}")
         self.current = ["-","-","Placeholder","Placeholder"]
         if self.untested:
             self.current = random.choice(self.untested)
@@ -462,7 +484,7 @@ class studying(qtw.QWidget):
             done.setWindowTitle("Done!")
             done.addButton("Ok", qtw.QMessageBox.YesRole)
             done.exec()
-            self.parentWidget().oStudy(self.DID)
+            self.parentWidget().study(0,self.DID)
         self.prompt.setText(self.current[2])   
 
     def enter(self):
@@ -486,7 +508,7 @@ class studying(qtw.QWidget):
         if not self.ans.text():
             MissingAnswer = qtw.QMessageBox()
             MissingAnswer.setIcon(qtw.QMessageBox.Warning)
-            MissingAnswer.setText(f"Please MissingAnswerer the solution to the prompt!")
+            MissingAnswer.setText(f"Please enter the solution to the prompt!")
             MissingAnswer.setWindowTitle("Please provide an answer")
             MissingAnswer.addButton("Ok", qtw.QMessageBox.YesRole)
             MissingAnswer.buttonClicked.connect(clicked)
@@ -504,7 +526,7 @@ class studying(qtw.QWidget):
                 CheckAnswer = qtw.QMessageBox()
                 CheckAnswer.setIcon(qtw.QMessageBox.Question)
                 CheckAnswer.setWindowTitle("Accuracy of the answer?")
-                CheckAnswer.setText(f"The answer was supposed to be: {self.currCheckAnswer[3]}\n\nYou CheckAnswerered: {self.ans.text()}")
+                CheckAnswer.setText(f"The answer was supposed to be: {self.current[3]}\n\nYou Answered: {self.ans.text()}")
                 CheckAnswer.addButton("Wrong", qtw.QMessageBox.YesRole)
                 CheckAnswer.addButton("Half Right", qtw.QMessageBox.YesRole)
                 CheckAnswer.addButton("Close Enough", qtw.QMessageBox.YesRole)
@@ -533,8 +555,7 @@ class studying(qtw.QWidget):
             self.noteIndex = len(self.notes)-1
         else:
             self.noteIndex -= 1
-        self.updateLabels()
-    
+        self.updateLabels()  
 
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
@@ -543,9 +564,11 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle("Revision Tool")
         self.setCentralWidget(startMenu())
     
-    def deckSel(self,ID):
+    def deckSel(self,ID = False):
         self.setWindowTitle("Deck Selection")
-        self.setCentralWidget(deckMenu(ID))
+        if ID:
+            self.ID = ID
+        self.setCentralWidget(deckMenu(self.ID))
 
     def menuSel(self):
         self.setWindowTitle("Revision Tool")
@@ -568,11 +591,6 @@ class MainWindow(qtw.QMainWindow):
         elif mode == 1:
             self.setWindowTitle(f"Testing notes in: {getdName(DID)}")
         self.setCentralWidget(studying(mode,DID,getdName(DID)))
-
-
-def getdName(DID):
-    sql = f"""SELECT deckName FROM decks WHERE DID = '{DID}'"""
-    return [x for x in (userdb_connect.execute(sql))][0][0]
 
 def main():
     app = qtw.QApplication([])
