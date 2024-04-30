@@ -259,7 +259,7 @@ class selDeck(qtw.QWidget):
         if ok:
             if FName == "":
                 dateTime = (datetime.datetime.now().strftime("%Y%m%d"))
-                FName = self.dName + "-" + dateTime
+                FName = self.dName + "_" + dateTime
             saveAndLoad.deckToDict(self.DID, FName)
         
 
@@ -325,7 +325,7 @@ class editDeck(qtw.QWidget):
         self.viewNotes.clicked.connect(self.vNotes)
 
         if self.edit:
-            self.NID = self.edit[1]
+            self.NID  = self.edit[1] 
             self.titleLE.setText(self.edit[2])
             self.contentTE.setText(self.edit[3])
 
